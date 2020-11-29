@@ -15,6 +15,10 @@
 
 version: '2'
 
+volumes:
+    prometheus_data: {}
+    grafana_data: {}
+
 services:
 
   redis:
@@ -37,6 +41,48 @@ services:
           - 5672:5672
           - 15672:15672
 
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ../config-monitoring/prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - 9090:9090
+    links:
+      - alertmanager:alertmanager
+    restart: always
+    deploy:
+      mode: global
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - 9093:9093
+    volumes:
+      - ../config-monitoring/alertmanager/:/etc/alertmanager/
+    restart: always
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    deploy:
+      mode: global
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../config-monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ../config-monitoring/grafana/provisioning:/etc/grafana/provisioning
+    env_file:
+      - config.monitoring
+  
   delfin:
     image: sodafoundation/delfin
     volumes:
